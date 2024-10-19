@@ -8,6 +8,54 @@ import openpyxl
 import matplotlib
 import io
 import json
+import firebase_admin
+from firebase_admin import credentials, db
+
+# Inicializar Firebase
+def inicializar_firebase():
+    if not firebase_admin._apps:
+        cred = credentials.Certificate({
+            "type": st.secrets["firebase"]["type"],
+            "project_id": st.secrets["firebase"]["project_id"],
+            "private_key_id": st.secrets["firebase"]["private_key_id"],
+            "private_key": st.secrets["firebase"]["private_key"],
+            "client_email": st.secrets["firebase"]["client_email"],
+            "client_id": st.secrets["firebase"]["client_id"],
+            "auth_uri": st.secrets["firebase"]["auth_uri"],
+            "token_uri": st.secrets["firebase"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
+        })
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://tu_project_id-default-rtdb.firebaseio.com/'
+        })
+
+# Función para cargar preferencias desde Firebase
+def cargar_preferencias():
+    try:
+        ref = db.reference('preferencias')
+        preferencias = ref.get()
+        if preferencias:
+            return preferencias
+        else:
+            return {}
+    except Exception as e:
+        st.error(f"Error al cargar preferencias: {e}")
+        return {}
+
+# Función para guardar preferencias en Firebase
+def guardar_preferencias(preferencias):
+    try:
+        ref = db.reference('preferencias')
+        ref.set(preferencias)
+    except Exception as e:
+        st.error(f"Error al guardar preferencias: {e}")
+
+# Inicializar Firebase
+inicializar_firebase()
+
+# Cargar las preferencias desde Firebase
+preferencias_fijas = cargar_preferencias()
 
 # Configurar la página para usar todo el ancho
 st.set_page_config(layout='wide')
@@ -51,19 +99,19 @@ if uploaded_file is not None:
     df_datos = pd.DataFrame(datos, columns=encabezados)
     df_datos.insert(0, 'Funciones', funciones)
 
-    # Inicializar el estado de sesión si no existe
+    # Inicializar el estado de sesión utilizando las preferencias fijas
     if 'colores_series' not in st.session_state:
-        st.session_state['colores_series'] = {}
+        st.session_state['colores_series'] = preferencias_fijas.get('colores_series', {})
     if 'estilos_linea' not in st.session_state:
-        st.session_state['estilos_linea'] = {}
+        st.session_state['estilos_linea'] = preferencias_fijas.get('estilos_linea', {})
     if 'grosor_linea' not in st.session_state:
-        st.session_state['grosor_linea'] = {}
+        st.session_state['grosor_linea'] = preferencias_fijas.get('grosor_linea', {})
     if 'series_seleccionadas' not in st.session_state:
-        st.session_state['series_seleccionadas'] = encabezados
+        st.session_state['series_seleccionadas'] = preferencias_fijas.get('series_seleccionadas', encabezados)
     if 'colores_rangos' not in st.session_state:
-        st.session_state['colores_rangos'] = {}
+        st.session_state['colores_rangos'] = preferencias_fijas.get('colores_rangos', {})
     if 'colores_valores' not in st.session_state:
-        st.session_state['colores_valores'] = {}
+        st.session_state['colores_valores'] = preferencias_fijas.get('colores_valores', {})
 
     # Barra lateral para los controles
     st.sidebar.header("Opciones de Personalización")
@@ -85,7 +133,7 @@ if uploaded_file is not None:
     if not series_seleccionadas:
         st.error("Por favor, selecciona al menos una serie para mostrar en el gráfico.")
     else:
-        # Colores predeterminados (los mismos que antes)
+        # Colores predeterminados
         colores_lineas_default = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
         # Personalización de colores y estilos
@@ -102,7 +150,11 @@ if uploaded_file is not None:
 
                 # Estilo de línea predeterminado
                 estilo_default = estilos_linea.get(serie, 'Sólida')
-                estilo = st.selectbox(f"Estilo de línea para {serie}", ['Sólida', 'Punteada', 'Punteada-Punteada'], index=['Sólida', 'Punteada', 'Punteada-Punteada'].index(estilo_default))
+                estilo = st.selectbox(
+                    f"Estilo de línea para {serie}",
+                    ['Sólida', 'Punteada', 'Punteada-Punteada'],
+                    index=['Sólida', 'Punteada', 'Punteada-Punteada'].index(estilo_default)
+                )
                 estilos_linea[serie] = estilo
 
                 # Grosor de línea predeterminado
@@ -272,33 +324,15 @@ if uploaded_file is not None:
                 )
             st.write("**SVG**: Ideal para escalado y alta calidad en impresiones.")
 
-        # Botones para guardar y cargar preferencias
-        st.sidebar.markdown("### Guardar/Cargar preferencias")
-
-        preferencias = {
-            'colores_series': colores_series,
-            'estilos_linea': estilos_linea,
-            'grosor_linea': grosor_linea,
-            'series_seleccionadas': series_seleccionadas,
-            'colores_rangos': colores_rangos,
-            'colores_valores': colores_valores
-        }
-
-        preferencias_json = json.dumps(preferencias)
-        st.sidebar.download_button(
-            label="Guardar preferencias",
-            data=preferencias_json,
-            file_name="preferencias.json",
-            mime="application/json"
-        )
-
-        preferencias_cargadas = st.sidebar.file_uploader("Cargar preferencias", type=['json'])
-        if preferencias_cargadas is not None:
-            preferencias_json = json.load(preferencias_cargadas)
-            st.session_state['colores_series'] = preferencias_json.get('colores_series', {})
-            st.session_state['estilos_linea'] = preferencias_json.get('estilos_linea', {})
-            st.session_state['grosor_linea'] = preferencias_json.get('grosor_linea', {})
-            st.session_state['series_seleccionadas'] = preferencias_json.get('series_seleccionadas', encabezados)
-            st.session_state['colores_rangos'] = preferencias_json.get('colores_rangos', {})
-            st.session_state['colores_valores'] = preferencias_json.get('colores_valores', {})
-            st.experimental_rerun()
+        # Botón para guardar preferencias fijas en Firebase
+        if st.sidebar.button("Guardar preferencias fijas"):
+            preferencias_actualizadas = {
+                'colores_series': st.session_state['colores_series'],
+                'estilos_linea': st.session_state['estilos_linea'],
+                'grosor_linea': st.session_state['grosor_linea'],
+                'series_seleccionadas': st.session_state['series_seleccionadas'],
+                'colores_rangos': st.session_state['colores_rangos'],
+                'colores_valores': st.session_state['colores_valores']
+            }
+            guardar_preferencias(preferencias_actualizadas)
+            st.sidebar.success("Preferencias guardadas correctamente.")
