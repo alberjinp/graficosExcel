@@ -11,6 +11,9 @@ import json
 import firebase_admin
 from firebase_admin import credentials, db
 
+# Configurar la página para usar todo el ancho
+st.set_page_config(layout='wide')
+
 # Inicializar Firebase
 def inicializar_firebase():
     if not firebase_admin._apps:
@@ -57,8 +60,7 @@ inicializar_firebase()
 # Cargar las preferencias desde Firebase
 preferencias_fijas = cargar_preferencias()
 
-# Configurar la página para usar todo el ancho
-st.set_page_config(layout='wide')
+
 
 # Configurar la fuente globalmente
 matplotlib.rcParams['font.family'] = 'Arial'
