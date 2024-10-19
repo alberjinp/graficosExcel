@@ -144,8 +144,8 @@ def reset_preferencias():
         st.error(f"Error al resetear preferencias: {e}")
 
 # Botón para resetear preferencias (Agregar esto temporalmente)
-if st.sidebar.button("Resetear preferencias a valores por defecto"):
-    reset_preferencias()
+#if st.sidebar.button("Resetear preferencias a valores por defecto"):
+#    reset_preferencias()
 
 # Cargar el archivo Excel
 uploaded_file = st.file_uploader("Sube tu archivo de Excel", type=['xlsx'])
