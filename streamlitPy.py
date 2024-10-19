@@ -170,6 +170,16 @@ if uploaded_file is not None:
                 st.session_state['colores_rangos'] = preferencias_fijas.get('colores_rangos', {})
             if 'colores_valores' not in st.session_state:
                 st.session_state['colores_valores'] = preferencias_fijas.get('colores_valores', {})
+            # Añadir los tamaños de fuente al estado de sesión
+            if 'tamaños_fuente' not in st.session_state:
+                st.session_state['tamaños_fuente'] = preferencias_fijas.get('tamaños_fuente', {
+                    'título': 18,
+                    'eje_x': 14,
+                    'eje_y': 14,
+                    'etiquetas_x': 10,
+                    'etiquetas_y': 12,
+                    'leyenda': 12
+                })
 
             # Barra lateral para los controles
             st.sidebar.header("Opciones de Personalización")
@@ -247,6 +257,25 @@ if uploaded_file is not None:
 
                 st.session_state['colores_rangos'] = colores_rangos
 
+                # **Personalización del tamaño de fuente**
+                tamaños_fuente = st.session_state['tamaños_fuente']
+                with st.sidebar.expander("Personalizar tamaño de fuente", expanded=False):
+                    tamaño_fuente_título = st.slider("Tamaño de fuente del título", 10, 40, tamaños_fuente.get('título', 18))
+                    tamaño_fuente_eje_x = st.slider("Tamaño de fuente del eje X", 8, 30, tamaños_fuente.get('eje_x', 14))
+                    tamaño_fuente_eje_y = st.slider("Tamaño de fuente del eje Y", 8, 30, tamaños_fuente.get('eje_y', 14))
+                    tamaño_fuente_etiquetas_x = st.slider("Tamaño de fuente de las etiquetas del eje X", 6, 20, tamaños_fuente.get('etiquetas_x', 10))
+                    tamaño_fuente_etiquetas_y = st.slider("Tamaño de fuente de las etiquetas del eje Y", 6, 20, tamaños_fuente.get('etiquetas_y', 12))
+                    tamaño_fuente_leyenda = st.slider("Tamaño de fuente de la leyenda", 6, 20, tamaños_fuente.get('leyenda', 12))
+
+                # Actualizar los tamaños de fuente en el estado de sesión
+                tamaños_fuente['título'] = tamaño_fuente_título
+                tamaños_fuente['eje_x'] = tamaño_fuente_eje_x
+                tamaños_fuente['eje_y'] = tamaño_fuente_eje_y
+                tamaños_fuente['etiquetas_x'] = tamaño_fuente_etiquetas_x
+                tamaños_fuente['etiquetas_y'] = tamaño_fuente_etiquetas_y
+                tamaños_fuente['leyenda'] = tamaño_fuente_leyenda
+                st.session_state['tamaños_fuente'] = tamaños_fuente
+
                 # Mapear estilos de línea a formatos de Matplotlib
                 estilos_mpl = {
                     'Sólida': '-',
@@ -255,7 +284,7 @@ if uploaded_file is not None:
                 }
 
                 # Crear la gráfica con Matplotlib
-                fig, ax = plt.subplots(figsize=(25, 9), dpi=300)
+                fig, ax = plt.subplots(figsize=(30, 10), dpi=300)  # Aumentar el tamaño del gráfico
 
                 # Seleccionar el tipo de gráfico
                 if tipo_grafico.lower() == 'barra':
@@ -312,18 +341,27 @@ if uploaded_file is not None:
                     colores_rotulos.append(color_rotulo)
 
                 # Ajustar los rótulos del eje X
-                etiquetas = [
-                    funcion if isinstance(funcion, str) else ''
-                    for funcion in funciones
-                ]
+                etiquetas = []
+                for idx, funcion in enumerate(funciones):
+                    if isinstance(funcion, str):
+                        if idx < 3:
+                            # Primeras tres etiquetas: siempre en dos líneas
+                            etiquetas.append(funcion.replace(' ', '\n', 1))  # Reemplazar el primer espacio por un salto de línea
+                        else:
+                            # Etiquetas restantes: alternar entre una y dos líneas
+                            if (idx - 3) % 2 == 0:
+                                etiquetas.append(funcion)  # Una línea
+                            else:
+                                etiquetas.append(funcion.replace(' ', '\n', 1))  # Dos líneas
+                    else:
+                        etiquetas.append('')
 
                 plt.xticks(
                     ticks=range(len(funciones)),
                     labels=etiquetas,
-                    fontsize=8,
+                    fontsize=tamaños_fuente['etiquetas_x'],  # Tamaño de fuente personalizado
                     fontweight='bold',
-                    ha='right',
-                    rotation=15  # Rotar las etiquetas 15 grados
+                    ha='center'
                 )
 
                 for tick_label, color in zip(ax.get_xticklabels(), colores_rotulos):
@@ -331,13 +369,23 @@ if uploaded_file is not None:
                     tick_label.set_fontweight('bold')
                     tick_label.set_antialiased(True)
 
-                plt.xlabel('Funciones', fontsize=12, fontweight='bold')
-                plt.ylabel('Valores', fontsize=12, fontweight='bold')
-                plt.title(titulo_grafico, fontsize=16, fontweight='bold')
-                plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=len(series_seleccionadas), fontsize=10)
+                # Ajustar el tamaño de fuente del eje Y y su rótulo
+                ax.tick_params(axis='y', labelsize=tamaños_fuente['etiquetas_y'])  # Tamaño de los números del eje Y
+                ax.yaxis.label.set_size(tamaños_fuente['eje_y'])                    # Tamaño del rótulo del eje Y
+
+                # Configurar el labelpad para mover el título del eje X hacia abajo
+                plt.xlabel('Funciones', fontsize=tamaños_fuente['eje_x'], fontweight='bold', labelpad=20)
+                plt.ylabel('Valores', fontsize=tamaños_fuente['eje_y'], fontweight='bold')
+                plt.title(titulo_grafico, fontsize=tamaños_fuente['título'], fontweight='bold')
+
+                # Configurar la leyenda con una posición ajustada
+                plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=len(series_seleccionadas), fontsize=tamaños_fuente['leyenda'])
 
                 # Ajustar el rango del eje Y
                 plt.ylim(0, 5)
+
+                # Ajustar los márgenes para asegurar una buena distribución de los elementos
+                plt.subplots_adjust(bottom=0.2, top=0.85)
 
                 plt.tight_layout()
 
@@ -383,7 +431,8 @@ if uploaded_file is not None:
                         'grosor_linea': st.session_state['grosor_linea'],
                         'series_seleccionadas': st.session_state['series_seleccionadas'],
                         'colores_rangos': st.session_state['colores_rangos'],
-                        'colores_valores': st.session_state['colores_valores']
+                        'colores_valores': st.session_state['colores_valores'],
+                        'tamaños_fuente': st.session_state['tamaños_fuente']  # Añadimos los tamaños de fuente
                     }
 
                     # Sanitizar las claves antes de guardar
@@ -392,3 +441,13 @@ if uploaded_file is not None:
                     # Guardar las preferencias sanitizadas
                     guardar_preferencias(preferencias_sanitizadas)
                     st.sidebar.success("Preferencias guardadas correctamente.")
+
+
+
+
+
+
+
+
+
+
