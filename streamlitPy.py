@@ -255,7 +255,7 @@ if uploaded_file is not None:
                 }
 
                 # Crear la gráfica con Matplotlib
-                fig, ax = plt.subplots(figsize=(22, 9), dpi=300)
+                fig, ax = plt.subplots(figsize=(25, 9), dpi=300)
 
                 # Seleccionar el tipo de gráfico
                 if tipo_grafico.lower() == 'barra':
@@ -313,7 +313,7 @@ if uploaded_file is not None:
 
                 # Ajustar los rótulos del eje X
                 etiquetas = [
-                    funcion.replace(' ', '\n') if isinstance(funcion, str) else ''
+                    funcion if isinstance(funcion, str) else ''
                     for funcion in funciones
                 ]
 
@@ -322,8 +322,8 @@ if uploaded_file is not None:
                     labels=etiquetas,
                     fontsize=8,
                     fontweight='bold',
-                    ha='center',
-                    rotation=90  # Rotar las etiquetas 90 grados
+                    ha='right',
+                    rotation=15  # Rotar las etiquetas 15 grados
                 )
 
                 for tick_label, color in zip(ax.get_xticklabels(), colores_rotulos):
