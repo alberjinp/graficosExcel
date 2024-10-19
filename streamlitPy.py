@@ -5,7 +5,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import io
-import json
 import firebase_admin
 from firebase_admin import credentials, db
 import base64
@@ -19,21 +18,25 @@ matplotlib.rcParams['font.family'] = 'Arial'
 # Función para inicializar Firebase
 def inicializar_firebase():
     if not firebase_admin._apps:
-        cred = credentials.Certificate({
-            "type": st.secrets["firebase"]["type"],
-            "project_id": st.secrets["firebase"]["project_id"],
-            "private_key_id": st.secrets["firebase"]["private_key_id"],
-            "private_key": st.secrets["firebase"]["private_key"],
-            "client_email": st.secrets["firebase"]["client_email"],
-            "client_id": st.secrets["firebase"]["client_id"],
-            "auth_uri": st.secrets["firebase"]["auth_uri"],
-            "token_uri": st.secrets["firebase"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
-        })
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://tu_project_id-default-rtdb.firebaseio.com/'
-        })
+        try:
+            cred = credentials.Certificate({
+                "type": st.secrets["firebase"]["type"],
+                "project_id": st.secrets["firebase"]["project_id"],
+                "private_key_id": st.secrets["firebase"]["private_key_id"],
+                "private_key": st.secrets["firebase"]["private_key"],
+                "client_email": st.secrets["firebase"]["client_email"],
+                "client_id": st.secrets["firebase"]["client_id"],
+                "auth_uri": st.secrets["firebase"]["auth_uri"],
+                "token_uri": st.secrets["firebase"]["token_uri"],
+                "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
+            })
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://excelgraph-67ab7-default-rtdb.europe-west1.firebasedatabase.app/'
+            })
+        except Exception as e:
+            st.error(f"Error al inicializar Firebase: {e}")
+            st.stop()
 
 # Función para sanitizar las claves (reemplaza caracteres no permitidos)
 def sanitize_key(key):
@@ -66,7 +69,7 @@ def cargar_preferencias():
             return {}
     except Exception as e:
         st.error(f"Error al cargar preferencias: {e}")
-        return {}
+        st.stop()
 
 # Función para guardar preferencias en Firebase
 def guardar_preferencias(preferencias):
@@ -75,6 +78,7 @@ def guardar_preferencias(preferencias):
         ref.set(preferencias)
     except Exception as e:
         st.error(f"Error al guardar preferencias: {e}")
+        st.stop()
 
 # Función para generar enlace de descarga
 def generar_enlace_descarga(data, filename, texto_link):
@@ -132,27 +136,27 @@ uploaded_file = st.file_uploader("Sube tu archivo de Excel", type=['xlsx'])
 if uploaded_file is not None:
     # Leer el archivo Excel y extraer los datos
     df = pd.read_excel(uploaded_file, engine='openpyxl')
-    
+
     # Obtener los encabezados de las columnas
     encabezados = df.columns.tolist()
-    
+
     # Asegurarnos de que la primera columna es 'Funciones'
     if encabezados[0].lower() != 'funciones':
         st.error("El archivo Excel debe tener una columna llamada 'Funciones' como la primera columna.")
     else:
         # Obtener los nombres de las funciones
         funciones = df['Funciones'].astype(str).tolist()
-        
+
         # Obtener las series (omitimos la columna 'Funciones')
         series = encabezados[1:]
-        
+
         # Verificar que hay funciones y series
         if len(funciones) == 0 or len(series) == 0:
             st.error("El archivo Excel debe contener al menos una función y una serie de datos.")
         else:
             # Crear un DataFrame con los datos
             df_datos = df.copy()
-    
+
             # Inicializar el estado de sesión utilizando las preferencias fijas
             if 'colores_series' not in st.session_state:
                 st.session_state['colores_series'] = preferencias_fijas.get('colores_series', {})
@@ -166,16 +170,16 @@ if uploaded_file is not None:
                 st.session_state['colores_rangos'] = preferencias_fijas.get('colores_rangos', {})
             if 'colores_valores' not in st.session_state:
                 st.session_state['colores_valores'] = preferencias_fijas.get('colores_valores', {})
-    
+
             # Barra lateral para los controles
             st.sidebar.header("Opciones de Personalización")
-    
+
             # Solicitar el título del gráfico
             titulo_grafico = st.sidebar.text_input("Título del gráfico", "Gráfico generado desde Python")
-    
+
             # Solicitar el tipo de gráfico
             tipo_grafico = st.sidebar.selectbox("Tipo de gráfico", ["Línea", "Barra", "Dispersión"])
-    
+
             # Seleccionar las series a incluir
             series_seleccionadas = st.sidebar.multiselect(
                 "Selecciona las series a mostrar",
@@ -183,25 +187,25 @@ if uploaded_file is not None:
                 default=st.session_state['series_seleccionadas']
             )
             st.session_state['series_seleccionadas'] = series_seleccionadas
-    
+
             if not series_seleccionadas:
                 st.error("Por favor, selecciona al menos una serie para mostrar en el gráfico.")
             else:
                 # Colores predeterminados
                 colores_lineas_default = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-    
+
                 # Personalización de colores y estilos
                 colores_series = st.session_state['colores_series']
                 estilos_linea = st.session_state['estilos_linea']
                 grosor_linea = st.session_state['grosor_linea']
-    
+
                 for idx, serie in enumerate(series_seleccionadas):
                     with st.sidebar.expander(f"Personalizar serie: {serie}", expanded=False):
                         # Color predeterminado
                         color_default = colores_series.get(serie, colores_lineas_default[idx % len(colores_lineas_default)])
                         color = st.color_picker(f"Color para {serie}", color_default)
                         colores_series[serie] = color
-    
+
                         # Estilo de línea predeterminado
                         estilo_default = estilos_linea.get(serie, 'Sólida')
                         estilo = st.selectbox(
@@ -210,17 +214,17 @@ if uploaded_file is not None:
                             index=['Sólida', 'Punteada', 'Punteada-Punteada'].index(estilo_default)
                         )
                         estilos_linea[serie] = estilo
-    
+
                         # Grosor de línea predeterminado
                         grosor_default = grosor_linea.get(serie, 3)
                         grosor = st.slider(f"Grosor de línea para {serie}", 1, 5, grosor_default)
                         grosor_linea[serie] = grosor
-    
+
                 # Guardar en el estado de sesión
                 st.session_state['colores_series'] = colores_series
                 st.session_state['estilos_linea'] = estilos_linea
                 st.session_state['grosor_linea'] = grosor_linea
-    
+
                 # Personalización de los colores de los valores
                 colores_valores = st.session_state['colores_valores']
                 with st.sidebar.expander("Personalizar colores de valores", expanded=False):
@@ -230,9 +234,9 @@ if uploaded_file is not None:
                         color_default = colores_valores.get(valor_str, colores_valores_default[valor_str])
                         color = st.color_picker(f"Color para valor {valor}", color_default)
                         colores_valores[valor_str] = color  # Guardar como cadena para serialización JSON
-    
+
                 st.session_state['colores_valores'] = colores_valores
-    
+
                 # Personalización de los colores de fondo de los rangos
                 colores_rangos = st.session_state['colores_rangos']
                 with st.sidebar.expander("Personalizar colores de fondo de rangos", expanded=False):
@@ -240,19 +244,19 @@ if uploaded_file is not None:
                         color_default = colores_rangos.get(rango, colores_rangos_default[rango])
                         color = st.color_picker(f"Color para rango {rango}", color_default)
                         colores_rangos[rango] = color
-    
+
                 st.session_state['colores_rangos'] = colores_rangos
-    
+
                 # Mapear estilos de línea a formatos de Matplotlib
                 estilos_mpl = {
                     'Sólida': '-',
                     'Punteada': '--',
                     'Punteada-Punteada': ':'
                 }
-    
+
                 # Crear la gráfica con Matplotlib
                 fig, ax = plt.subplots(figsize=(22, 9), dpi=300)
-    
+
                 # Seleccionar el tipo de gráfico
                 if tipo_grafico.lower() == 'barra':
                     width = 0.8 / len(series_seleccionadas)  # Ancho de cada barra
@@ -288,13 +292,13 @@ if uploaded_file is not None:
                             markeredgecolor=colores_series.get(serie, colores_lineas_default[idx % len(colores_lineas_default)]),
                             label=serie
                         )
-    
+
                 # Rellenar el fondo del gráfico en base a los colores de los rangos
                 for rango in colores_rangos_default.keys():
                     y0, y1 = map(float, rango.split('-'))
                     color = colores_rangos.get(rango, colores_rangos_default[rango])
                     ax.axhspan(y0, y1, facecolor=color, alpha=0.3)
-    
+
                 # Cambiar el color del texto de los rótulos del eje X en base a los valores de la primera serie seleccionada
                 primera_serie = series_seleccionadas[0]
                 valores_serie = df_datos[primera_serie].tolist()
@@ -306,43 +310,47 @@ if uploaded_file is not None:
                     else:
                         color_rotulo = '#000000'
                     colores_rotulos.append(color_rotulo)
-    
+
                 # Ajustar los rótulos del eje X
                 etiquetas = [
                     funcion.replace(' ', '\n') if isinstance(funcion, str) else ''
                     for funcion in funciones
                 ]
-    
+
                 plt.xticks(
                     ticks=range(len(funciones)),
                     labels=etiquetas,
                     fontsize=8,
                     fontweight='bold',
-                    ha='center'
+                    ha='center',
+                    rotation=90  # Rotar las etiquetas 90 grados
                 )
-    
+
                 for tick_label, color in zip(ax.get_xticklabels(), colores_rotulos):
                     tick_label.set_color(color)
                     tick_label.set_fontweight('bold')
                     tick_label.set_antialiased(True)
-    
+
                 plt.xlabel('Funciones', fontsize=12, fontweight='bold')
                 plt.ylabel('Valores', fontsize=12, fontweight='bold')
                 plt.title(titulo_grafico, fontsize=16, fontweight='bold')
                 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=len(series_seleccionadas), fontsize=10)
-    
+
+                # Ajustar el rango del eje Y
+                plt.ylim(0, 5)
+
                 plt.tight_layout()
-    
+
                 # Mostrar la gráfica con Streamlit usando un buffer para mayor nitidez
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png', dpi=300)
                 buf.seek(0)
                 st.image(buf, use_column_width=True)
-    
+
                 # Opción para descargar la gráfica generada en formato PNG y SVG
                 st.write("### Descargar gráfico:")
                 col1, col2 = st.columns(2)
-    
+
                 with col1:
                     output_path_png = f"{titulo_grafico}.png"
                     fig.savefig(output_path_png, format='png', dpi=300, bbox_inches='tight')
@@ -354,7 +362,7 @@ if uploaded_file is not None:
                             mime="image/png"
                         )
                     st.write("**PNG**: Adecuado para uso en pantallas y documentos digitales.")
-    
+
                 with col2:
                     output_path_svg = f"{titulo_grafico}.svg"
                     fig.savefig(output_path_svg, format='svg', bbox_inches='tight')
@@ -366,7 +374,7 @@ if uploaded_file is not None:
                             mime="image/svg+xml"
                         )
                     st.write("**SVG**: Ideal para escalado y alta calidad en impresiones.")
-    
+
                 # Botón para guardar preferencias fijas en Firebase
                 if st.sidebar.button("Guardar preferencias fijas"):
                     preferencias_actualizadas = {
@@ -377,11 +385,10 @@ if uploaded_file is not None:
                         'colores_rangos': st.session_state['colores_rangos'],
                         'colores_valores': st.session_state['colores_valores']
                     }
-    
+
                     # Sanitizar las claves antes de guardar
                     preferencias_sanitizadas = sanitize_keys(preferencias_actualizadas)
-    
+
                     # Guardar las preferencias sanitizadas
                     guardar_preferencias(preferencias_sanitizadas)
                     st.sidebar.success("Preferencias guardadas correctamente.")
-
