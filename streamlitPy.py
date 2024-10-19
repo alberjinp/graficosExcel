@@ -1,10 +1,8 @@
 #-*- coding: Latin1 -*-
 
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import openpyxl
 import matplotlib
 import io
 import json
@@ -83,6 +81,25 @@ def generar_enlace_descarga(data, filename, texto_link):
     b64 = base64.b64encode(data).decode()
     return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">{texto_link}</a>'
 
+# Definir colores por defecto para los valores (hardcodeados)
+colores_valores_default = {
+    '0': '#FF0000',  # Rojo
+    '1': '#FFA500',  # Naranja
+    '2': '#FFFF00',  # Amarillo
+    '3': '#008000',  # Verde
+    '4': '#0000FF',  # Azul
+    '5': '#4B0082',  # Índigo
+}
+
+# Definir colores por defecto para los rangos (hardcodeados)
+colores_rangos_default = {
+    '0-1': '#FFC0C0',  # Rojo claro
+    '1-2': '#FFE0B2',  # Naranja claro
+    '2-3': '#FFFFE0',  # Amarillo claro
+    '3-4': '#C8E6C9',  # Verde claro
+    '4-5': '#BBDEFB',  # Azul claro
+}
+
 # Inicializar Firebase
 inicializar_firebase()
 
@@ -150,25 +167,6 @@ if uploaded_file is not None:
             if 'colores_valores' not in st.session_state:
                 st.session_state['colores_valores'] = preferencias_fijas.get('colores_valores', {})
     
-            # Definir colores por defecto para los valores (hardcodeados)
-            colores_valores_default = {
-                '0': '#FF0000',  # Rojo
-                '1': '#FFA500',  # Naranja
-                '2': '#FFFF00',  # Amarillo
-                '3': '#008000',  # Verde
-                '4': '#0000FF',  # Azul
-                '5': '#4B0082',  # Índigo
-            }
-    
-            # Definir colores por defecto para los rangos (hardcodeados)
-            colores_rangos_default = {
-                '0-1': '#FFC0C0',  # Rojo claro
-                '1-2': '#FFE0B2',  # Naranja claro
-                '2-3': '#FFFFE0',  # Amarillo claro
-                '3-4': '#C8E6C9',  # Verde claro
-                '4-5': '#BBDEFB',  # Azul claro
-            }
-    
             # Barra lateral para los controles
             st.sidebar.header("Opciones de Personalización")
     
@@ -227,9 +225,11 @@ if uploaded_file is not None:
                 colores_valores = st.session_state['colores_valores']
                 with st.sidebar.expander("Personalizar colores de valores", expanded=False):
                     for valor in sorted(colores_valores_default.keys()):
-                        color_default = colores_valores.get(str(valor), colores_valores_default[valor])
+                        # Aseguramos que valor es una cadena
+                        valor_str = str(valor)
+                        color_default = colores_valores.get(valor_str, colores_valores_default[valor_str])
                         color = st.color_picker(f"Color para valor {valor}", color_default)
-                        colores_valores[str(valor)] = color  # Guardar como cadena para serialización JSON
+                        colores_valores[valor_str] = color  # Guardar como cadena para serialización JSON
     
                 st.session_state['colores_valores'] = colores_valores
     
@@ -298,10 +298,14 @@ if uploaded_file is not None:
                 # Cambiar el color del texto de los rótulos del eje X en base a los valores de la primera serie seleccionada
                 primera_serie = series_seleccionadas[0]
                 valores_serie = df_datos[primera_serie].tolist()
-                colores_rotulos = [
-                    colores_valores.get(str(int(valor)), '#000000') if pd.notna(valor) and isinstance(valor, (int, float))
-                    else '#000000' for valor in valores_serie
-                ]
+                colores_rotulos = []
+                for valor in valores_serie:
+                    if pd.notna(valor) and isinstance(valor, (int, float)):
+                        valor_str = str(int(valor))
+                        color_rotulo = colores_valores.get(valor_str, '#000000')
+                    else:
+                        color_rotulo = '#000000'
+                    colores_rotulos.append(color_rotulo)
     
                 # Ajustar los rótulos del eje X
                 etiquetas = [
