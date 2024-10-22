@@ -1,6 +1,5 @@
 # -*- coding: Latin1 -*-
 
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,7 +8,6 @@ import io
 import firebase_admin
 from firebase_admin import credentials, db
 import base64
-import re  # Importar el módulo de expresiones regulares
 
 # Configurar la página para usar todo el ancho
 st.set_page_config(layout='wide')
@@ -27,15 +25,13 @@ colores_valores_default = [
     '#4B0082',  # Índigo
 ]
 
-# **1. Establecer Rangos de Colores por Defecto con Formato Consistente**
-# Definir colores por defecto para los rangos (hardcodeados) en formato 'min_max-max_max'
+# Definir colores por defecto para los rangos (hardcodeados)
 colores_rangos_default = {
-    '-0_5-0_5': '#FFC0C0',   # Rojo claro
-    '0_5-1_5': '#FFE0B2',    # Naranja claro
-    '1_5-2_5': '#FFFFE0',    # Amarillo claro
-    '2_5-3_5': '#C8E6C9',    # Verde claro
-    '3_5-4_5': '#BBDEFB',    # Azul claro
-    '4_5-5_5': '#D3E0F0',    # Azul más claro para el nuevo rango
+    '0-1': '#FFC0C0',  # Rojo claro
+    '1-2': '#FFE0B2',  # Naranja claro
+    '2-3': '#FFFFE0',  # Amarillo claro
+    '3-4': '#C8E6C9',  # Verde claro
+    '4-5': '#BBDEFB',  # Azul claro
 }
 
 # Función para sanitizar las claves (reemplaza caracteres no permitidos)
@@ -191,21 +187,13 @@ if uploaded_file is not None:
                 if 'series_seleccionadas' not in st.session_state:
                     st.session_state['series_seleccionadas'] = preferencias_fijas.get('series_seleccionadas', series)
                 if 'colores_rangos' not in st.session_state:
-                    # Asegurarse de que solo se carguen rangos en el formato correcto
-                    colores_rangos = preferencias_fijas.get('colores_rangos', colores_rangos_default.copy())
-                    # Filtrar solo los rangos que existen en colores_rangos_default
-                    colores_rangos = {k: v for k, v in colores_rangos.items() if k in colores_rangos_default}
-                    # Añadir los rangos faltantes con valores por defecto
-                    for rango in colores_rangos_default.keys():
-                        if rango not in colores_rangos:
-                            colores_rangos[rango] = colores_rangos_default[rango]
-                    st.session_state['colores_rangos'] = colores_rangos
+                    st.session_state['colores_rangos'] = preferencias_fijas.get('colores_rangos', {})
                 if 'colores_valores' not in st.session_state:
                     # Asegurarnos de que colores_valores es una lista
                     colores_valores = preferencias_fijas.get('colores_valores', colores_valores_default.copy())
                     if isinstance(colores_valores, dict):
                         # Convertir dict a lista si es necesario
-                        colores_valores = [colores_valores_default[i] if i < len(colores_valores_default) else '#000000' for i in range(len(colores_valores_default))]
+                        colores_valores = [colores_valores_default.get(str(i), '#000000') for i in range(len(colores_valores_default))]
                     elif isinstance(colores_valores, list):
                         # Asegurarnos de que la lista tenga al menos los colores por defecto
                         for i in range(len(colores_valores_default)):
@@ -293,17 +281,17 @@ if uploaded_file is not None:
 
                     st.session_state['colores_valores'] = colores_valores
 
-                    # **2. Actualizar la Personalización de los Colores de Fondo de Rangos**
+                    # Personalización de los colores de fondo de los rangos
                     colores_rangos = st.session_state['colores_rangos']
                     with st.sidebar.expander("Personalizar colores de fondo de rangos", expanded=False):
                         for rango in colores_rangos_default.keys():
                             color_default = colores_rangos.get(rango, colores_rangos_default[rango])
-                            color = st.color_picker(f"Color para rango {rango.replace('_', '.')}", color_default)
+                            color = st.color_picker(f"Color para rango {rango}", color_default)
                             colores_rangos[rango] = color
 
                     st.session_state['colores_rangos'] = colores_rangos
 
-                    # **3. Personalización del Tamaño de Fuente**
+                    # **Personalización del tamaño de fuente**
                     tamaños_fuente = st.session_state['tamaños_fuente']
                     with st.sidebar.expander("Personalizar tamaño de fuente", expanded=False):
                         tamaño_fuente_título = st.slider("Tamaño de fuente del título", 10, 40, tamaños_fuente.get('título', 18))
@@ -329,7 +317,6 @@ if uploaded_file is not None:
                         'Punteada-Punteada': ':'
                     }
 
-                    # **4. Ajustar los Límites del Eje Y**
                     # Crear la gráfica con Matplotlib
                     fig, ax = plt.subplots(figsize=(30, 10), dpi=300)  # Aumentar el tamaño del gráfico
 
@@ -370,26 +357,14 @@ if uploaded_file is not None:
                                 label=serie
                             )
 
-                    # **5. Actualizar los Límites del Eje Y y las Áreas de Fondo**
-                    # Cambiar el rango del eje Y de 0-5 a -0.5-5.5
-                    plt.ylim(-0.5, 5.5)
-
                     # Rellenar el fondo del gráfico en base a los colores de los rangos
                     for rango in colores_rangos_default.keys():
                         try:
-                            # Utilizar regex para manejar rangos con números negativos
-                            # Convertir el rango de 'min_max-max_max' a 'min.max-max.max'
-                            rango_convertido = rango.replace('_', '.')
-                            matches = re.match(r'^(-?\d+\.?\d*)-(-?\d+\.?\d*)$', rango_convertido)
-                            if matches:
-                                y0 = float(matches.group(1))
-                                y1 = float(matches.group(2))
-                                color = colores_rangos.get(rango, colores_rangos_default[rango])
-                                ax.axhspan(y0, y1, facecolor=color, alpha=0.3)
-                            else:
-                                st.warning(f"Rango inválido '{rango}'. Asegúrate de que esté en el formato 'min_max-max_max'.")
-                        except Exception as e:
-                            st.warning(f"Error al procesar el rango '{rango}': {e}")
+                            y0, y1 = map(float, rango.split('-'))
+                            color = colores_rangos.get(rango, colores_rangos_default[rango])
+                            ax.axhspan(y0, y1, facecolor=color, alpha=0.3)
+                        except ValueError:
+                            st.warning(f"Rango inválido '{rango}'. Asegúrate de que esté en el formato 'min-max'.")
 
                     # Cambiar el color del texto de los rótulos del eje X en base a los valores de la primera serie seleccionada
                     primera_serie = series_seleccionadas[0]
@@ -435,10 +410,7 @@ if uploaded_file is not None:
                         tick_label.set_fontweight('bold')
                         tick_label.set_antialiased(True)
 
-                    # **6. Configurar las Etiquetas del Eje Y**
-                    # Configurar los ticks del eje Y para que solo muestren de 0 a 5
-                    ax.set_yticks(range(0, 6))  # 0,1,2,3,4,5
-                    ax.set_yticklabels(range(0, 6))
+                    # Ajustar el tamaño de fuente del eje Y y su rótulo
                     ax.tick_params(axis='y', labelsize=tamaños_fuente['etiquetas_y'])  # Tamaño de los números del eje Y
                     ax.yaxis.label.set_size(tamaños_fuente['eje_y'])                    # Tamaño del rótulo del eje Y
 
@@ -450,8 +422,9 @@ if uploaded_file is not None:
                     # Configurar la leyenda con una posición ajustada
                     plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=len(series_seleccionadas), fontsize=tamaños_fuente['leyenda'])
 
-                    # **7. Ajustar los Márgenes y Layout**
-                    # Ajustar el rango del eje Y ya está hecho arriba
+                    # Ajustar el rango del eje Y
+                    plt.ylim(0, 5)
+
                     # Ajustar los márgenes para asegurar una buena distribución de los elementos
                     plt.subplots_adjust(bottom=0.2, top=0.85)
 
@@ -511,4 +484,23 @@ if uploaded_file is not None:
                         # Guardar las preferencias sanitizadas
                         guardar_preferencias(preferencias_sanitizadas)
                         st.sidebar.success("Preferencias guardadas correctamente.")
+
+                    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

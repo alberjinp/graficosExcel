@@ -23,6 +23,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="graficosExcel.py" />
+    <Compile Include="streamlitPy - Copy %282%29.py" />
+    <Compile Include="streamlitPy - Copy.py" />
     <Compile Include="streamlitPy.py">
       <SubType>Code</SubType>
     </Compile>
